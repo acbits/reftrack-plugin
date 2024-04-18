@@ -6,13 +6,12 @@ custom functions.
 
 ## Installation
 
-Unpack the source package and run `make install`{.verbatim} to install
-the gcc plugin. You could pass a value for DESTDIR if you need to
-package it.
+Unpack the source package and run `make install` to install the gcc
+plugin. You could pass a value for DESTDIR if you need to package it.
 
 ## Sanity test
 
-``` {.bash org-language="sh"}
+``` bash
 $ cd testcases
 $ make run
 ```
@@ -23,8 +22,8 @@ All test cases should pass.
 
 Add
 `-fplugin=/usr/lib64/reftrack.so -I/usr/include/reftrack -fplugin-arg-reftrack-addref=reftrack_addref
-    -fplugin-arg-reftrack-removeref=reftrack_removeref` to
-`CFLAGS`{.verbatim}. These are the minimum arguments required.
+    -fplugin-arg-reftrack-removeref=reftrack_removeref` to `CFLAGS`.
+These are the minimum arguments required.
 
 ## Plugin arguments
 
@@ -144,30 +143,27 @@ instrumentation makes it easier to implement reference counted GC rather
 than mark and sweep GC and a sample implementation is provided in
 *hrcmm.h*.
 
-The *`rc_malloc()`{.verbatim}*, *`rc_calloc()`{.verbatim}* are wrappers
-for the standard *`malloc()`{.verbatim}*, *`calloc()`{.verbatim}*
-functions that prefix a small header to the object allocation by
-requesting extra memory for the header. The header contains the
-reference count and optionally the filename and line number where
-allocation took place. Similarly, *`rc_realloc()`{.verbatim}*,
-*`rc_free()`{.verbatim}* are wrappers for *`realloc()`{.verbatim}* and
-*`free()`{.verbatim}*.
+The *`rc_malloc()`*, *`rc_calloc()`* are wrappers for the standard
+*`malloc()`*, *`calloc()`* functions that prefix a small header to the
+object allocation by requesting extra memory for the header. The header
+contains the reference count and optionally the filename and line number
+where allocation took place. Similarly, *`rc_realloc()`*, *`rc_free()`*
+are wrappers for *`realloc()`* and *`free()`*.
 
-Note: There is no need to call *`rc_free()`{.verbatim}* directly in
-almost all cases.
+Note: There is no need to call *`rc_free()`* directly in almost all
+cases.
 
 ## Macros
 
--   `REFTRACK_STRUCT(X)` Declares functions X~addref~(), X~removeref~()
--   `REFTRACK_EPILOG(X)` Defines functions X~create~(), X~addref~(), and
-    X~removeref~()
--   `REFTRACK_EPILOG_WITH_DTOR(X)` Same as REFTRACK~EPILOG~(X), but
-    calls X~destroy~() before calling free(). The programmer has to
-    provide a definition for X~destroy~().
--   `REFTRACK_DEBUG` Prints the location of allocation and release of
-    memory objects. Uses extra space in the allocated object.
--   `REFTRACK_COUNT(p)` Returns the reference count of the given
-    pointer.
+- `REFTRACK_STRUCT(X)` Declares functions `X_addref()`, `X_removeref()`
+- `REFTRACK_EPILOG(X)` Defines functions `X_create()`, `X_addref()`, and
+  `X_removeref()`
+- `REFTRACK_EPILOG_WITH_DTOR(X)` Same as REFTRACK<sub>EPILOG</sub>(X),
+  but calls `X_destroy()` before calling `free()`. The programmer has to
+  provide a definition for `X_destroy()`.
+- `REFTRACK_DEBUG` Prints the location of allocation and release of
+  memory objects. Uses extra space in the allocated object.
+- `REFTRACK_COUNT(p)` Returns the reference count of the given pointer.
 
 ## Destructors
 
@@ -181,10 +177,9 @@ TODO
 
 ## Limitations
 
--   Array of tracked pointers is currently unsupported. Look at
-    *array2.c* example in the `testcases`{.verbatim} directory for a way
-    to handle them.
--   The plugin is unable to distinguish pointers holding an address to
-    object on the stack vs heap. Use of a mark in the header attached to
-    the allocated object mitigates it in most cases at the cost of extra
-    storage.
+- Array of tracked pointers is currently unsupported. Look at *array2.c*
+  example in the `testcases` directory for a way to handle them.
+- The plugin is unable to distinguish pointers holding an address to
+  object on the stack vs heap. Use of a mark in the header attached to
+  the allocated object mitigates it in most cases at the cost of extra
+  storage.
