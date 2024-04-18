@@ -158,9 +158,9 @@ cases.
 - `REFTRACK_STRUCT(X)` Declares functions `X_addref()`, `X_removeref()`
 - `REFTRACK_EPILOG(X)` Defines functions `X_create()`, `X_addref()`, and
   `X_removeref()`
-- `REFTRACK_EPILOG_WITH_DTOR(X)` Same as REFTRACK<sub>EPILOG</sub>(X),
-  but calls `X_destroy()` before calling `free()`. The programmer has to
-  provide a definition for `X_destroy()`.
+- `REFTRACK_EPILOG_WITH_DTOR(X)` Same as `REFTRACK_EPILOG(X)`, but calls
+  `X_destroy()` before calling `free()`. The programmer has to provide a
+  definition for `X_destroy()`.
 - `REFTRACK_DEBUG` Prints the location of allocation and release of
   memory objects. Uses extra space in the allocated object.
 - `REFTRACK_COUNT(p)` Returns the reference count of the given pointer.
