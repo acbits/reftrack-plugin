@@ -175,6 +175,10 @@ the signature `REFTRACK_DESTRUCTOR_FN void X_destroy(struct X *const)`
 
 TODO
 
+## Usage within Linux kernel
+
+TODO The header file requires more testing.
+
 ## Limitations
 
 - Array of tracked pointers is currently unsupported. Look at *array2.c*
