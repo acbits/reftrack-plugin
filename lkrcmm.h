@@ -1,4 +1,9 @@
 // GCC reftrack plugin based heap management for the Linux kernel
+// SPDX-License-Identifier: GPL-2.0-only
+/************************************************************
+Copyright (C) 2022-2023 Aravind Ceyardass (dev@aravind.cc)
+************************************************************/
+
 
 #ifndef LKRCMM__
 #define LKRCMM__
