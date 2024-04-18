@@ -41,12 +41,12 @@ typedef atomic_int refcount_t;
 
 struct reftrack_ {
 #ifdef REFTRACK_DEBUG
-	const char *filename;	// base filename of file where allocation happened
-	unsigned lineno;	// line number in the corresponding file
+    const char *filename;    // base filename of file where allocation happened
+    unsigned lineno;    // line number in the corresponding file
     int mark;
 #endif
 
-	refcount_t rc;		// reference count
+    refcount_t rc;        // reference count
     void (*dtor)(void*); // destructor
 };
 
@@ -112,15 +112,15 @@ rc_alloc_helper_(size_t n, allocator_t alloc_fn
                  REFTRACK_DEBUG_PARAMS_DECL)
 {
 
-	void *p;
+    void *p;
 
-	p = alloc_fn(n+sizeof(reftrack_t));
+    p = alloc_fn(n+sizeof(reftrack_t));
 
-	if (p) {
+    if (p) {
         inc_alloc_count();
 
-		reftrack_t *const rtp = (reftrack_t *)p;
-		REFCOUNT_SET(rtp->rc, 0);
+        reftrack_t *const rtp = (reftrack_t *)p;
+        REFCOUNT_SET(rtp->rc, 0);
         p = REFTRACK_BODY(p);
         debug_info_init(rtp);
         rtp->dtor = NULL;
@@ -129,8 +129,8 @@ rc_alloc_helper_(size_t n, allocator_t alloc_fn
                p , n, filename, lineno);
 #endif
 
-	}
-	return p;
+    }
+    return p;
 }
 
 UNUSED REFTRACK_IGNORE MALLOC_LIKE static void *
@@ -152,20 +152,20 @@ rc_realloc_helper_(const void *p,
                    size_t new_size
                    REFTRACK_DEBUG_PARAMS_DECL)
 {
-	void *rv = NULL;
+    void *rv = NULL;
 
-	if (!p) {
-		rv = rc_alloc_helper_(new_size, malloc REFTRACK_DEBUG_PARAMS);
-		/* we have to increment reference count here due to realloc
-		 * behaving like malloc and we are forced to declare realloc as a heap function.
-		 */
-		if (rv) {
-			REFCOUNT_INC(REFTRACK_COUNTER(rv));
-		}
-	} else if (new_size) {
-		void *orig_p = REFTRACK_HDR(p);
+    if (!p) {
+        rv = rc_alloc_helper_(new_size, malloc REFTRACK_DEBUG_PARAMS);
+        /* we have to increment reference count here due to realloc
+         * behaving like malloc and we are forced to declare realloc as a heap function.
+         */
+        if (rv) {
+            REFCOUNT_INC(REFTRACK_COUNTER(rv));
+        }
+    } else if (new_size) {
+        void *orig_p = REFTRACK_HDR(p);
         // TODO check for overflow
-		size_t total_size=new_size+sizeof(reftrack_t);
+        size_t total_size=new_size+sizeof(reftrack_t);
 
         rv = realloc(orig_p, total_size);
         if (rv != orig_p) {
@@ -175,7 +175,7 @@ rc_realloc_helper_(const void *p,
                        p, count);
         }
 
-	} else {
+    } else {
 /*
  * case: new_size is zero
  * We don't free the object as in original implementation because the object is
@@ -183,9 +183,9 @@ rc_realloc_helper_(const void *p,
  * NO ACTION NEEDED
  */
 
-	}
+    }
 
-	return rv ? REFTRACK_BODY(rv) : rv;
+    return rv ? REFTRACK_BODY(rv) : rv;
 
 }
 
@@ -193,14 +193,14 @@ REFTRACK_IGNORE static void
 rc_free_helper_(const void *p, void (*const free_fn)(void *)
                 REFTRACK_DEBUG_PARAMS_DECL){
 
-	if(p) {
+    if(p) {
         if (!mark_found(p, __func__))
             return;
 
-		reftrack_t *rtp = REFTRACK_HDR(p);
+        reftrack_t *rtp = REFTRACK_HDR(p);
         inc_free_count();
-		if (REFCOUNT_READ(rtp->rc)) {
-			printf(
+        if (REFCOUNT_READ(rtp->rc)) {
+            printf(
 #ifdef REFTRACK_DEBUG
                 "reftrack: WARNING object |0x%p| allocated at |%s:%u|, freed at |%s:%u| has |%d| reference(s)\n",
                 p, rtp->filename, rtp->lineno,
@@ -210,14 +210,14 @@ rc_free_helper_(const void *p, void (*const free_fn)(void *)
                 rtp, REFCOUNT_READ(rtp->rc)
 #endif
                 );
-		}
+        }
 
-		if (free_fn) {
+        if (free_fn) {
             rtp->mark = 0; // clear mark
             free_fn(rtp);
         }
 
-	}
+    }
 }
 
 #define rc_malloc(n)     rc_alloc_helper_(n, malloc REFTRACK_DEBUG_ARGS)
