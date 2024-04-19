@@ -4,6 +4,13 @@
 allocated objects though it could be used for other purposes by writing
 custom functions.
 
+## Minimum Requirements
+
+- GCC: \>= 12.3 Other GCC versions might work, but testing on 9.3 showed
+  that GCC encounters an internal compiler error at -O2 or -O3 on some
+  test cases.
+- make: \>= 4.2.1
+
 ## Installation
 
 Unpack the source package and run `make install` to install the gcc
