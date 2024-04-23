@@ -116,20 +116,20 @@ rc_alloc_helper_(size_t n, allocator_t alloc_fn
 
     p = alloc_fn(n+sizeof(reftrack_t));
 
-    if (p) {
-        inc_alloc_count();
+    if (!p) return NULL;
 
-        reftrack_t *const rtp = (reftrack_t *)p;
-        REFCOUNT_SET(rtp->rc, 0);
-        p = REFTRACK_BODY(p);
-        debug_info_init(rtp);
-        rtp->dtor = NULL;
+    inc_alloc_count();
+
+    reftrack_t *const rtp = (reftrack_t *)p;
+    REFCOUNT_SET(rtp->rc, 0);
+    p = REFTRACK_BODY(p);
+    debug_info_init(rtp);
+    rtp->dtor = NULL;
 #ifdef REFTRACK_DEBUG
-        printf("reftrack: Allocated |0x%p| of size |%lu| bytes at |%s:%u|\n",
-               p , n, filename, lineno);
+    printf("reftrack: Allocated |0x%p| of size |%lu| bytes at |%s:%u|\n",
+           p , n, filename, lineno);
 #endif
 
-    }
     return p;
 }
 
@@ -193,31 +193,30 @@ REFTRACK_IGNORE static void
 rc_free_helper_(const void *p, void (*const free_fn)(void *)
                 REFTRACK_DEBUG_PARAMS_DECL){
 
-    if(p) {
-        if (!mark_found(p, __func__))
-            return;
+    if(!p || !mark_found(p, __func__))
+        return;
 
-        reftrack_t *rtp = REFTRACK_HDR(p);
-        inc_free_count();
-        if (REFCOUNT_READ(rtp->rc)) {
-            printf(
+    reftrack_t *rtp = REFTRACK_HDR(p);
+    inc_free_count();
+    if (REFCOUNT_READ(rtp->rc)) {
+        printf(
 #ifdef REFTRACK_DEBUG
-                "reftrack: WARNING object |0x%p| allocated at |%s:%u|, freed at |%s:%u| has |%d| reference(s)\n",
-                p, rtp->filename, rtp->lineno,
-                filename, lineno, REFCOUNT_READ(rtp->rc)
+            "reftrack: WARNING object |0x%p| allocated at |%s:%u|, freed at |%s:%u| has |%d| reference(s)\n",
+            p, rtp->filename, rtp->lineno,
+            filename, lineno, REFCOUNT_READ(rtp->rc)
 #else
-                "reftrack: WARNING object |0x%p| freed has |%u| reference(s)\n",
-                rtp, REFCOUNT_READ(rtp->rc)
+            "reftrack: WARNING object |0x%p| freed has |%u| reference(s)\n",
+            rtp, REFCOUNT_READ(rtp->rc)
 #endif
-                );
-        }
-
-        if (free_fn) {
-            rtp->mark = 0; // clear mark
-            free_fn(rtp);
-        }
-
+            );
     }
+
+    if (free_fn) {
+        rtp->mark = 0; // clear mark
+        free_fn(rtp);
+    }
+
+
 }
 
 #define rc_malloc(n)     rc_alloc_helper_(n, malloc REFTRACK_DEBUG_ARGS)
@@ -227,13 +226,11 @@ rc_free_helper_(const void *p, void (*const free_fn)(void *)
 
 
 void reftrack_addref_(const void *const p, const char *type_name) {
-    if (p){
-        if (!mark_found(p, __func__))
-            return;
-        REFCOUNT_INC(REFTRACK_COUNTER(p));
-        REFTRACK_TRACE_LOG(printf("reftrack:%s:|0x%p|:+1\n", type_name, p));
-    }
+    if (!p || !mark_found(p, __func__))
+        return;
 
+    REFCOUNT_INC(REFTRACK_COUNTER(p));
+    REFTRACK_TRACE_LOG(printf("reftrack:%s:|0x%p|:+1\n", type_name, p));
 }
 
 #line 1
@@ -250,19 +247,17 @@ UNUSED void reftrack_removeref(const void *const p) {
 
     const char *const ctx = __func__;
 
-    if (p) {
-        if (!mark_found(p, ctx))
-            return;
+    if (!p || !mark_found(p, ctx))
+        return;
 
-        REFTRACK_TRACE_LOG(printf("reftrack:|0x%p|:-1\n", p));
-        reftrack_t *const rtp = REFTRACK_HDR(p);
-        /* checking for one as the value before decrement to zero is one */
-        if (REFCOUNT_DEC(rtp->rc) == 1){
-            REFTRACK_DEBUG_LOG(printf("reftrack: releasing object |0x%p|\n", p));
-            void (*dtor)(void *) = REFTRACK_DTOR(p);
-            if (dtor) dtor((void*)p);
-            rc_free((void*)p);
-        }
+    REFTRACK_TRACE_LOG(printf("reftrack:|0x%p|:-1\n", p));
+    reftrack_t *const rtp = REFTRACK_HDR(p);
+    /* checking for one as the value before decrement to zero is one */
+    if (REFCOUNT_DEC(rtp->rc) == 1){
+        REFTRACK_DEBUG_LOG(printf("reftrack: releasing object |0x%p|\n", p));
+        void (*dtor)(void *) = REFTRACK_DTOR(p);
+        if (dtor) dtor((void*)p);
+        rc_free((void*)p);
     }
 }
 
@@ -276,18 +271,17 @@ UNUSED void reftrack_removeref(const void *const p) {
 
 #define DECL_REMOVEREF(S,DTOR)                                          \
     void S##_removeref(const struct S *const p) {                       \
-        if (p) {                                                        \
-            if (!mark_found(p, __func__))                               \
-                return;                                                 \
-            REFTRACK_TRACE_LOG(printf("reftrack:%s:|0x%p|:-1\n", #S, p)); \
-            reftrack_t *const rtp = REFTRACK_HDR(p);                    \
-            /* checking for one as the value before decrement to zero is one */ \
-            if (REFCOUNT_DEC(rtp->rc) == 1){                            \
-                REFTRACK_DEBUG_LOG(printf("reftrack: releasing object |0x%p| type |%s|\n", p, #S)); \
-                do{ DTOR((struct S*)p); }while(0);                      \
-                rc_free((void*)p);                                      \
-            }                                                           \
+        if (!p || !mark_found(p, __func__))                             \
+            return;                                                     \
+        REFTRACK_TRACE_LOG(printf("reftrack:%s:|0x%p|:-1\n", #S, p));   \
+        reftrack_t *const rtp = REFTRACK_HDR(p);                        \
+        /* checking for one as the value before decrement to zero is one */ \
+        if (REFCOUNT_DEC(rtp->rc) == 1){                                \
+            REFTRACK_DEBUG_LOG(printf("reftrack: releasing object |0x%p| type |%s|\n", p, #S)); \
+            do{ DTOR((struct S*)p); }while(0);                          \
+            rc_free((void*)p);                                          \
         }                                                               \
+                                                                       \
     }
 
 
