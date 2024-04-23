@@ -88,8 +88,8 @@ is transformed into
 ``` c
 typedef struct S S;
 S *p = ... , *q = ...;
-S_addref(q); 
-S_removeref(p); 
+S_addref(q);
+S_removeref(p);
 p = q;
 ```
 
@@ -171,8 +171,9 @@ cases.
 - `REFTRACK_DEBUG` Prints the location of allocation and release of
   memory objects. Uses extra space in the allocated object.
 - `REFTRACK_COUNT(p)` Returns the reference count of the given pointer.
+- `REFTRACK_DTOR(p)` Returns the destructor associated with the object.
 
-## Destructors
+# Destructors
 
 Destructors are special functions that get called on an object when
 their reference count is zero and is about to be freed. They must have
