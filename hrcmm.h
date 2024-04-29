@@ -35,7 +35,6 @@ typedef atomic_int refcount_t;
 #define REFTRACK_TRACE_LOG(...)
 #endif
 
-
 //
 // structure that is prefixed to allocated memory
 
@@ -45,9 +44,8 @@ struct reftrack_ {
     unsigned lineno;    // line number in the corresponding file
     int mark;
 #endif
-
     refcount_t rc;        // reference count
-    void (*dtor)(void*); // destructor
+
 };
 
 typedef struct reftrack_ reftrack_t;
@@ -58,7 +56,6 @@ typedef void *(*allocator_t)(size_t);
 #define REFTRACK_BODY(hdrp) ((void *)hdrp + sizeof(reftrack_t))
 #define REFTRACK_COUNTER(bodyp) (REFTRACK_HDR(bodyp)->rc)
 #define REFTRACK_COUNT(bodyp) REFCOUNT_READ(REFTRACK_COUNTER(bodyp))
-#define REFTRACK_DTOR(bodyp) (REFTRACK_HDR(bodyp)->dtor)
 
 #ifdef REFTRACK_DEBUG
 
@@ -124,7 +121,6 @@ rc_alloc_helper_(size_t n, allocator_t alloc_fn
     REFCOUNT_SET(rtp->rc, 0);
     p = REFTRACK_BODY(p);
     debug_info_init(rtp);
-    rtp->dtor = NULL;
 #ifdef REFTRACK_DEBUG
     printf("reftrack: Allocated |0x%p| of size |%lu| bytes at |%s:%u|\n",
            p , n, filename, lineno);
@@ -255,8 +251,6 @@ UNUSED void reftrack_removeref(const void *const p) {
     /* checking for one as the value before decrement to zero is one */
     if (REFCOUNT_DEC(rtp->rc) == 1){
         REFTRACK_DEBUG_LOG(printf("reftrack: releasing object |0x%p|\n", p));
-        void (*dtor)(void *) = REFTRACK_DTOR(p);
-        if (dtor) dtor((void*)p);
         rc_free((void*)p);
     }
 }

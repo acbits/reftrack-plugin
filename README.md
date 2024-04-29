@@ -171,7 +171,6 @@ cases.
 - `REFTRACK_DEBUG` Prints the location of allocation and release of
   memory objects. Uses extra space in the allocated object.
 - `REFTRACK_COUNT(p)` Returns the reference count of the given pointer.
-- `REFTRACK_DTOR(p)` Returns the destructor associated with the object.
 
 # Destructors
 
