@@ -837,7 +837,7 @@ namespace reftrack {
             return param;
 
         for (auto fnp = DECL_ARGUMENTS(fn); fnp; fnp = DECL_CHAIN(fnp)){
-            if (i == arg_index){
+            if (i++ == arg_index){
                 param = fnp;
                 break;
             }
