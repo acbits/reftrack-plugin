@@ -26,7 +26,8 @@ TARGETS := sample \
 		realloc \
 		calloc \
 		hash_test \
-		block_test
+		block_test \
+		dual_param
 
 TARGET_OBJS := $(foreach t, ${TARGETS}, ${t}.o)
 
