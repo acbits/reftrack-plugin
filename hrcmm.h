@@ -25,8 +25,8 @@ typedef atomic_int refcount_t;
 #define REFCOUNT_DEC(v) atomic_fetch_sub(&(v), 1)
 #define REFCOUNT_READ(v) atomic_load(&(v))
 
-#define check_add_overflow(...) false
-
+#define check_add_overflow(a, b, s) __builtin_add_overflow(a, b, s)
+#define check_mul_overflow(a, b, p) __builtin_mul_overflow(a, b, p)
 
 // define this to enable every change in the number of references. Generates extremely verbose output.
 #ifdef REFTRACK_TRACE
@@ -110,8 +110,12 @@ rc_alloc_helper_(size_t n, allocator_t alloc_fn
 {
 
     void *p;
+    size_t total_size = 0;
 
-    p = alloc_fn(n+sizeof(reftrack_t));
+    if (check_add_overflow(n, sizeof(reftrack_t), &total_size))
+        return NULL;
+
+    p = alloc_fn(total_size);
 
     if (!p) return NULL;
 
@@ -135,9 +139,9 @@ rc_calloc_helper_(size_t n,
                   allocator_t alloc_fn
                   REFTRACK_DEBUG_PARAMS_DECL)
 {
-
-    size_t total_size = n*size;
-    // TODO check for overflow of total_size
+    size_t total_size = 0;
+    if (check_mul_overflow(n, size, &total_size))
+        return NULL;
 
     return rc_alloc_helper_(total_size, alloc_fn REFTRACK_DEBUG_PARAMS);
 }
@@ -160,10 +164,13 @@ rc_realloc_helper_(const void *p,
         }
     } else if (new_size) {
         void *orig_p = REFTRACK_HDR(p);
-        // TODO check for overflow
-        size_t total_size=new_size+sizeof(reftrack_t);
+
+        size_t total_size = 0;
+        if (check_add_overflow(new_size, sizeof(reftrack_t), &total_size))
+            return NULL;
 
         rv = realloc(orig_p, total_size);
+
         if (rv != orig_p) {
             int count = REFTRACK_COUNT(REFTRACK_BODY(rv));
             if (count > 1)
