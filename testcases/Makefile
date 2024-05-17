@@ -5,7 +5,7 @@
 #
 #
 
-SHELL := /bin/sh
+SHELL := /usr/bin/bash
 
 TOPDIR := ..
 
