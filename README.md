@@ -66,8 +66,8 @@ REFTRACK_EPILOG(S)
 ```
 
 `REFTRACK_EPILOG(S)` is a macro that provides default definitions for
-`S_addref()` and `S_removeref()`. If you want call a destructor before
-the object is released, use `REFTRACK_EPILOG_WITH_DTOR(S)` macro.
+`S_addref()` and `S_removeref()`. If you want to call a destructor
+before the object is released, use `REFTRACK_EPILOG_WITH_DTOR(S)` macro.
 
 ## Transformations
 
