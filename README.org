@@ -138,7 +138,9 @@ Destructors are special functions that get called on an object when their refere
 is zero and is about to be freed. They must
 have the signature ~REFTRACK_DESTRUCTOR_FN void X_destroy(struct X *const)~
 ** Heap functions
-TODO
+Functions that change the attributes or size of an allocated memory like /=realloc()=/ should be tagged with ~REFTRACK_HEAP_FN~.
+This attribute is useful only if you are implementing a custom GC solution. In all other cases, it might not be necessary. 
+
 ** Usage within Linux kernel
 TODO The header file requires more testing.
 ** Limitations
