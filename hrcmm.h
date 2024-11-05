@@ -15,6 +15,10 @@ Copyright (C) 2023 Aravind Ceyardass (dev@aravind.cc)
 #include <stdatomic.h>
 #include "reftrack.h"
 
+#ifdef REFTRACK_DEBUG
+#define REFTRACK_USE_MARK
+#endif
+
 #define REFTRACK_MARKER 0xfacebeef
 #define UNUSED __attribute__((unused))
 
@@ -42,6 +46,8 @@ struct reftrack_ {
 #ifdef REFTRACK_DEBUG
     const char *filename;    // base filename of file where allocation happened
     unsigned lineno;    // line number in the corresponding file
+#endif
+#ifdef REFTRACK_USE_MARK
     int mark;
 #endif
     refcount_t rc;        // reference count
@@ -57,16 +63,8 @@ typedef void *(*allocator_t)(size_t);
 #define REFTRACK_COUNTER(bodyp) (REFTRACK_HDR(bodyp)->rc)
 #define REFTRACK_COUNT(bodyp) REFCOUNT_READ(REFTRACK_COUNTER(bodyp))
 
-#ifdef REFTRACK_DEBUG
-
-#define REFTRACK_DEBUG_LOG(...)                 \
-    do {                                        \
-        __VA_ARGS__;                            \
-    } while (0)
-
-static refcount_t reftrack_alloc_count, reftrack_free_count;
-UNUSED static void inc_alloc_count() { REFCOUNT_INC(reftrack_alloc_count); }
-UNUSED static void inc_free_count() { REFCOUNT_INC(reftrack_free_count); }
+#ifdef REFTRACK_USE_MARK
+#define REFTRACK_SET_MARK(p, v) do{ (p)->mark = v; } while(0)
 
 static bool mark_found(const void *p, const char *const fname){
     if (!p)
@@ -80,11 +78,26 @@ static bool mark_found(const void *p, const char *const fname){
     return true;
 }
 
+#else
+#define REFTRACK_SET_MARK(p, v)
+#define mark_found(p, fn) true
+#endif
+
+#ifdef REFTRACK_DEBUG
+
+#define REFTRACK_DEBUG_LOG(...)                 \
+    do {                                        \
+        __VA_ARGS__;                            \
+    } while (0)
+
+static refcount_t reftrack_alloc_count, reftrack_free_count;
+UNUSED static void inc_alloc_count() { REFCOUNT_INC(reftrack_alloc_count); }
+UNUSED static void inc_free_count() { REFCOUNT_INC(reftrack_free_count); }
+
 #define debug_info_init(x) do{                  \
         reftrack_t *const p = x;                \
         p->filename = filename;                 \
         p->lineno = lineno;                     \
-        p->mark = REFTRACK_MARKER;              \
     }while(0)
 
 #define REFTRACK_DEBUG_ARGS    , __BASE_FILE__, __LINE__
@@ -96,7 +109,7 @@ static bool mark_found(const void *p, const char *const fname){
 #define REFTRACK_DEBUG_LOG(...)
 #define inc_alloc_count()
 #define inc_free_count()
-#define mark_found(p, fn) true
+
 #define debug_info_init(x)
 #define REFTRACK_DEBUG_ARGS
 #define REFTRACK_DEBUG_PARAMS_DECL
@@ -123,6 +136,7 @@ rc_alloc_helper_(size_t n, allocator_t alloc_fn
 
     reftrack_t *const rtp = (reftrack_t *)p;
     REFCOUNT_SET(rtp->rc, 0);
+    REFTRACK_SET_MARK(rtp, REFTRACK_MARKER);
     p = REFTRACK_BODY(p);
     debug_info_init(rtp);
 #ifdef REFTRACK_DEBUG
@@ -215,7 +229,7 @@ rc_free_helper_(const void *p, void (*const free_fn)(void *)
     }
 
     if (free_fn) {
-        rtp->mark = 0; // clear mark
+        REFTRACK_SET_MARK(rtp, 0); // clear mark
         free_fn(rtp);
     }
 
