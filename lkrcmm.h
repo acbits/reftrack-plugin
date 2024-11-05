@@ -77,7 +77,7 @@ typedef struct reftrack_ reftrack_t;
 
 #ifdef REFTRACK_DEBUG
 
-static void debug_info_init(reftrack_t *const rtp){
+static void reftrack_debug_init(reftrack_t *const rtp){
   rtp->filename = filename;
   rtp->lineno = lineno;
 
@@ -89,7 +89,7 @@ static void debug_info_init(reftrack_t *const rtp){
 
 #else
 
-#define debug_info_init(x) /* discard */
+#define reftrack_debug_init(x) /* discard */
 #define REFTRACK_DEBUG_ARGS
 #define REFTRACK_DEBUG_PARAMS_DECL
 #define REFTRACK_DEBUG_PARAMS
@@ -99,7 +99,7 @@ static void debug_info_init(reftrack_t *const rtp){
 static void reftrack_hdr_init(reftrack_t *const rtp){
         REFCOUNT_SET(rtp->rc, 0);
         REFTRACK_SET_MARK(rtp, REFTRACK_MARKER);
-        debug_info_init(rtp);
+        reftrack_debug_init(rtp);
         rtp->dtor = NULL;
 }
 
