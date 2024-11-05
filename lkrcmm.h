@@ -21,6 +21,11 @@ Copyright (C) 2022-2023 Aravind Ceyardass (dev@aravind.cc)
 #include <linux/atomic.h>
 #include <linux/reftrack.h>
 
+#ifdef REFTRACK_DEBUG
+#define REFTRACK_USE_MARK
+#endif
+
+
 #ifdef REFTRACK_TRACE
 #define REFTRACK_TRACE_LOG(...) do{__VA_ARGS__}while(0)
 #else
@@ -40,10 +45,12 @@ typedef atomic_t reftrack_count_t;
 // structure that is prefixed to allocated memory
 
 struct reftrack_ {
-	reftrack_count_t rc;		// reference count
+    reftrack_count_t rc;        // reference count
 #ifdef REFTRACK_DEBUG
-	const char *filename;	// filename of file where allocation happened
-	unsigned lineno;	// line number in the corresponding file
+    const char *filename;      // filename of file where allocation happened
+    unsigned lineno;          // line number in the corresponding file
+#endif
+#ifdef REFTRACK_USE_MARK
     int mark;
 #endif
     void (*dtor)(void*); // destructor
@@ -56,14 +63,24 @@ typedef struct reftrack_ reftrack_t;
 #define REFTRACK_COUNTER(bodyp) (REFTRACK_HDR(bodyp)->rc)
 #define REFTRACK_COUNT(bodyp) REFCOUNT_READ(REFTRACK_COUNTER(bodyp))
 
-#ifdef REFTRACK_DEBUG
+#ifdef REFTRACK_USE_MARK
 
-#define mark_found(bodyp)  (REFTRACK_HDR(bodyp)->mark == REFTRACK_MARKER)
+#define REFTRACK_SET_MARK(p, v) do{ (p)->mark = v; } while(0)
+#define mark_found(bodyp) (REFTRACK_HDR(bodyp)->mark == REFTRACK_MARKER)
+
+#else
+
+#define REFTRACK_SET_MARK(p, v) /* discard */
+#define mark_found(p) true
+
+#endif
+
+#ifdef REFTRACK_DEBUG
 
 static void debug_info_init(reftrack_t *const rtp){
   rtp->filename = filename;
   rtp->lineno = lineno;
-  rtp->mark = REFTRACK_MARKER;
+
 }
 
 #define REFTRACK_DEBUG_ARGS    ,__BASE_FILE__,__LINE__
@@ -72,8 +89,7 @@ static void debug_info_init(reftrack_t *const rtp){
 
 #else
 
-#define mark_found(p) true
-#define debug_info_init(x)
+#define debug_info_init(x) /* discard */
 #define REFTRACK_DEBUG_ARGS
 #define REFTRACK_DEBUG_PARAMS_DECL
 #define REFTRACK_DEBUG_PARAMS
@@ -82,6 +98,7 @@ static void debug_info_init(reftrack_t *const rtp){
 
 static void reftrack_hdr_init(reftrack_t *const rtp){
         REFCOUNT_SET(rtp->rc, 0);
+        REFTRACK_SET_MARK(rtp, REFTRACK_MARKER);
         debug_info_init(rtp);
         rtp->dtor = NULL;
 }
@@ -206,7 +223,7 @@ rc_free_helper_(void *p, void (*const free_fn)(const void *)
 		}
 
 		if (free_fn) {
-            rtp->mark = 0;
+            REFTRACK_SET_MARK(rtp, 0);
             free_fn(rtp);
 
         }
