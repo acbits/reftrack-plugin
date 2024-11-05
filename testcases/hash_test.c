@@ -1,7 +1,6 @@
 #define REFTRACK_DEBUG
 #define REFTRACK_TRACE
 
-#define REFTRACK_DEBUG
 #include "hrcmm.h"
 #include "uthash.h"
 #include <assert.h>

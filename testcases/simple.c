@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#define REFTRACK_DEBUG
+
 #define REFTRACK_TRACE
-#define REFTRACK_DEBUG
+
 #include "hrcmm.h"
 
 typedef struct REFTRACK  {
