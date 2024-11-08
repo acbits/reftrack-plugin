@@ -38,7 +38,7 @@ typedef atomic_t reftrack_count_t;
 #define REFCOUNT_INC(v)        atomic_inc(&(v))
 #define REFCOUNT_DEC(v)        atomic_dec(&(v))
 #define REFCOUNT_DEC_READ(v)   atomic_dec_and_test(&(v))
-#define REFCOUNT_READ(v)       atomic_load(&(v))
+#define REFCOUNT_READ(v)       atomic_read(&(v))
 
 #define REFTRACK_MARKER 0xfacebeef
 
@@ -78,11 +78,12 @@ typedef struct reftrack_ reftrack_t;
 
 #ifdef REFTRACK_DEBUG
 
-static void reftrack_debug_init(reftrack_t *const rtp){
-  rtp->filename = filename;
-  rtp->lineno = lineno;
+#define reftrack_debug_init(x) do{              \
+        reftrack_t *const p = x;                \
+        p->filename = filename;                 \
+        p->lineno = lineno;                     \
+    }while(0)
 
-}
 
 #define REFTRACK_DEBUG_ARGS    ,__BASE_FILE__,__LINE__
 #define REFTRACK_DEBUG_PARAMS_DECL  ,const char *const filename,const unsigned lineno
