@@ -25,22 +25,7 @@ Copyright (C) 2022-2023 Aravind Ceyardass (dev@aravind.cc)
 #define REFTRACK_USE_MARK
 #endif
 
-
-#ifdef REFTRACK_TRACE
-#define REFTRACK_TRACE_LOG(...) do{__VA_ARGS__}while(0)
-#else
-#define REFTRACK_TRACE_LOG(...)
-#endif
-
 typedef atomic_t reftrack_count_t;
-
-#define REFCOUNT_SET(v, x)     atomic_set(&(v), x)
-#define REFCOUNT_INC(v)        atomic_inc(&(v))
-#define REFCOUNT_DEC(v)        atomic_dec(&(v))
-#define REFCOUNT_DEC_READ(v)   atomic_dec_and_test(&(v))
-#define REFCOUNT_READ(v)       atomic_read(&(v))
-
-#define REFTRACK_MARKER 0xfacebeef
 
 // structure that is prefixed to allocated memory
 
@@ -57,6 +42,27 @@ struct reftrack_ {
 };
 
 typedef struct reftrack_ reftrack_t;
+
+// Enable extremely verbose tracing.
+// TODO At present, it is a compile time option. Make it dynamic through kernel facilities.
+
+#ifdef REFTRACK_TRACE
+#define REFTRACK_TRACE_LOG(...) do{__VA_ARGS__}while(0)
+#else
+#define REFTRACK_TRACE_LOG(...)
+#endif
+
+
+#define REFCOUNT_SET(v, x)     atomic_set(&(v), x)
+#define REFCOUNT_INC(v)        atomic_inc(&(v))
+#define REFCOUNT_DEC(v)        atomic_dec(&(v))
+#define REFCOUNT_DEC_READ(v)   atomic_dec_and_test(&(v))
+#define REFCOUNT_READ(v)       atomic_read(&(v))
+
+#define REFTRACK_MARKER 0xfacebeef
+
+
+typedef void *(*alloc_fn_t)(size_t, gfp_t);
 
 #define REFTRACK_HDR(bodyp) ((reftrack_t *)((void *)(bodyp) - sizeof(reftrack_t)))
 #define REFTRACK_BODY(hdrp) ((void*)hdrp + sizeof(reftrack_t))
@@ -78,27 +84,50 @@ typedef struct reftrack_ reftrack_t;
 
 #ifdef REFTRACK_DEBUG
 
-#define reftrack_debug_init(x) do{              \
-        reftrack_t *const p = x;                \
-        p->filename = filename;                 \
-        p->lineno = lineno;                     \
-    }while(0)
-
-
 #define REFTRACK_DEBUG_ARGS    ,__BASE_FILE__,__LINE__
 #define REFTRACK_DEBUG_PARAMS_DECL  ,const char *const filename,const unsigned lineno
 #define REFTRACK_DEBUG_PARAMS ,filename,lineno
 
+#define reftrack_debug_init(x)                  \
+    do{                                         \
+        reftrack_t *const p = x;                \
+        p->filename = filename;                 \
+        p->lineno = lineno;                     \
+    } while(0)
+
+#define REFTRACK_DEBUG_LOG(...)                \
+    do{                                         \
+        __VA_ARGS__;                            \
+    } while (0)
+
 #else
 
-#define reftrack_debug_init(x) /* discard */
 #define REFTRACK_DEBUG_ARGS
 #define REFTRACK_DEBUG_PARAMS_DECL
 #define REFTRACK_DEBUG_PARAMS
+#define reftrack_debug_init(x) /* discard */
+#define REFTRACK_DEBUG_LOG(...)
 
 #endif
 
-static void reftrack_hdr_init(reftrack_t *const rtp){
+/*
+ * Create wrappers as some of the kernel memory functions are already macros and we can't use macros
+ * due to their limitations.
+ */
+
+static inline void *old_kmalloc(size_t n, gfp_t flags){	return kmalloc(n, flags); }
+
+static inline void *old_vmalloc(unsigned long n){ return vmalloc(n); }
+
+static inline void *old_vzalloc(unsigned long n){ return vzalloc(n); }
+
+static inline void *old_kvmalloc(size_t n, gfp_t flags){ return kvmalloc(n, flags); }
+
+static inline void old_kfree(const void *p) { kfree(p); }
+static inline void old_vfree(const void *p) { vfree(p); }
+static inline void old_kvfree(const void *p) { kvfree(p); }
+
+static void reftrack_hdr_init(reftrack_t *const rtp REFTRACK_DEBUG_PARAMS_DECL){
         REFCOUNT_SET(rtp->rc, 0);
         REFTRACK_SET_MARK(rtp, REFTRACK_MARKER);
         reftrack_debug_init(rtp);
@@ -106,7 +135,7 @@ static void reftrack_hdr_init(reftrack_t *const rtp){
 }
 
 REFTRACK_IGNORE MALLOC_LIKE static void *
-rc_alloc_helper_(size_t n, gfp_t flags, void *(*alloc_fn)(size_t, gfp_t) REFTRACK_DEBUG_PARAMS_DECL)
+rc_alloc_helper_(size_t n, gfp_t flags, alloc_fn_t alloc_fn REFTRACK_DEBUG_PARAMS_DECL)
 {
 
 	size_t total_size;
@@ -118,7 +147,7 @@ rc_alloc_helper_(size_t n, gfp_t flags, void *(*alloc_fn)(size_t, gfp_t) REFTRAC
 	p = alloc_fn(total_size, flags);
 
 	if (p) {
-        reftrack_hdr_init(p);
+        reftrack_hdr_init(p REFTRACK_DEBUG_PARAMS);
         p = REFTRACK_BODY(p);
 	}
 	return p;
@@ -133,7 +162,7 @@ rc_kcalloc_(size_t n, size_t size, gfp_t flags REFTRACK_DEBUG_PARAMS_DECL)
 	if (unlikely(check_mul_overflow(n, size, &total_size)))
 		return NULL;
 	else
-		return rc_alloc_helper_(total_size, flags REFTRACK_DEBUG_PARAMS);
+		return rc_alloc_helper_(total_size, flags, old_kmalloc REFTRACK_DEBUG_PARAMS);
 }
 
 
@@ -151,7 +180,7 @@ rc_vmalloc_helper_(unsigned long n, void *(*const alloc_fn)(unsigned long)
 	p = alloc_fn(total_size);
 
 	if (p) {
-		reftrack_hdr_init(p);
+		reftrack_hdr_init(p REFTRACK_DEBUG_PARAMS);
         p = REFTRACK_BODY(p);
 	}
 	return p;
@@ -164,7 +193,7 @@ rc_krealloc_(const void *p, size_t new_size, gfp_t flags
 	void *rv = NULL;
 
 	if (!p) {
-		rv = rc_alloc_helper_(new_size, flags REFTRACK_DEBUG_PARAMS);
+		rv = rc_alloc_helper_(new_size, flags, old_kmalloc REFTRACK_DEBUG_PARAMS);
 		/* we have to increment reference count here due to realloc
 		 * behaving like malloc and we are forced to declare krealloc as a heap function.
 		 */
@@ -208,42 +237,44 @@ REFTRACK_IGNORE static void
 rc_free_helper_(void *p, void (*const free_fn)(const void *)
                 REFTRACK_DEBUG_PARAMS_DECL){
 
-	if(p) {
-		reftrack_t *rtp = REFTRACK_HDR(p);
+	if(!p)
+        return;
 
-		if (REFCOUNT_READ(rtp->rc) != 0) {
-			pr_warn(
+    reftrack_t *rtp = REFTRACK_HDR(p);
+
+    if (REFCOUNT_READ(rtp->rc) != 0) {
+        pr_warn(
 #ifdef REFTRACK_DEBUG
-                       "reftrack: WARNING object |0x%p| allocated at |%s:%u|, freed at |%s:%u| has |%d| reference(s)\n",
-                       rtp, rtp->filename, rtp->lineno,
-                       filename, lineno, REFCOUNT_READ(rtp->rc)
+            "reftrack: WARNING object |0x%p| allocated at |%s:%u|, freed at |%s:%u| has |%d| reference(s)\n",
+            rtp, rtp->filename, rtp->lineno,
+            filename, lineno, REFCOUNT_READ(rtp->rc)
 #else
-                       "reftrack: WARNING object |0x%p| has |%u| reference(s)\n",
-                       rtp, REFCOUNT_READ(rtp->rc)
+            "reftrack: WARNING object |0x%p| has |%u| reference(s)\n",
+            rtp, REFCOUNT_READ(rtp->rc)
 #endif
-                );
-		}
+            );
+    }
 
-		if (free_fn) {
-            REFTRACK_SET_MARK(rtp, 0);
-            free_fn(rtp);
+    if (free_fn) {
+        REFTRACK_SET_MARK(rtp, 0);
+        free_fn(rtp);
 
-        }
+    }
 
-	}
 }
 
 
-#define rc_kmalloc(n, f)     rc_alloc_helper_(n, f, kmalloc REFTRACK_DEBUG_ARGS)
+
+#define rc_kmalloc(n, f)     rc_alloc_helper_(n, f, old_kmalloc REFTRACK_DEBUG_ARGS)
 #define rc_kcalloc(c, n, f)  rc_kcalloc_(c, n, f REFTRACK_DEBUG_ARGS)
-#define rc_kzalloc(n, f)     rc_alloc_helper_(n, (f|__GFP_ZERO), kmalloc REFTRACK_DEBUG_ARGS)
-#define rc_vmalloc(n)        rc_vmalloc_helper_(n, vmalloc REFTRACK_DEBUG_ARGS)
-#define rc_vzalloc(n)        rc_vmalloc_helper_(n, vzalloc REFTRACK_DEBUG_ARGS)
-#define rc_kvmalloc(n, f)    rc_alloc_helper_(n, f, kvmalloc REFTRACK_DEBUG_ARGS)
+#define rc_kzalloc(n, f)     rc_alloc_helper_(n, (f|__GFP_ZERO), old_kmalloc REFTRACK_DEBUG_ARGS)
+#define rc_vmalloc(n)        rc_vmalloc_helper_(n, old_vmalloc REFTRACK_DEBUG_ARGS)
+#define rc_vzalloc(n)        rc_vmalloc_helper_(n, old_vzalloc REFTRACK_DEBUG_ARGS)
+#define rc_kvmalloc(n, f)    rc_alloc_helper_(n, f, old_kvmalloc REFTRACK_DEBUG_ARGS)
 #define rc_krealloc(p, n, f) rc_krealloc_(p, n, f REFTRACK_DEBUG_ARGS)
-#define rc_kfree(x)          rc_free_helper_(x, kfree REFTRACK_DEBUG_ARGS)
-#define rc_vfree(x)          rc_free_helper_(x, vfree REFTRACK_DEBUG_ARGS)
-#define rc_kvfree(x)         rc_free_helper_(x, kvfree REFTRACK_DEBUG_ARGS)
+#define rc_kfree(x)          rc_free_helper_(x, old_kfree REFTRACK_DEBUG_ARGS)
+#define rc_vfree(x)          rc_free_helper_(x, old_vfree REFTRACK_DEBUG_ARGS)
+#define rc_kvfree(x)         rc_free_helper_(x, old_kvfree REFTRACK_DEBUG_ARGS)
 
 
 #define REFTRACK_PROLOG(S)                                            \
@@ -252,34 +283,37 @@ rc_free_helper_(void *p, void (*const free_fn)(const void *)
     static void S##_removeref(const struct S *const);                 \
     REFTRACK_IGNORE static void S##_destroy(struct S *const);
 
-#define DECL_ADDREF(S)                                              \
-    void S##_addref(const struct S *const p) {                      \
-        if (p){                                                     \
-            if (!mark_found(p)){                                     \
-                pr_warn("reftrack: Invalid pointer/use-after-free |0x%p| to |%s|\n", p, #S); \
-                return;                                              \
-            }                                                        \
-            REFCOUNT_INC(REFTRACK_COUNTER(p));                       \
-            REFTRACK_TRACE_LOG(pr_info("%s:|0x%p|:+1\n", #S, p));    \
-        }                                                            \
+#define DECL_ADDREF(S)                                                  \
+    static inline void S##_addref(const struct S *const p) {            \
+        if (!p)                                                         \
+            return;                                                     \
+                                                                        \
+        if (!mark_found(p)){                                            \
+            pr_warn("reftrack: Invalid pointer/use-after-free |0x%p| to |%s_addref|\n", p, #S); \
+            return;                                                     \
+        }                                                               \
+        REFCOUNT_INC(REFTRACK_COUNTER(p));                              \
+        REFTRACK_TRACE_LOG(pr_info("%s:|0x%p|:+1\n", #S, p));           \
     }
 
-#define DECL_REMOVEREF(S, DTOR)                                        \
-    void S##_removeref(const struct S *const p) {                       \
-        if (p) {                                                        \
-            if (!mark_found(p)) {                                       \
-                pr_warn("reftrack: Invalid pointer/use-after-free |0x%p| to |%s|\n", p, #S); \
-                return;                                                 \
-            }                                                           \
-            REFTRACK_TRACE_LOG(pr_info("%s:|0x%p|:-1n", #S, p));        \
-            reftrack_t *const rtp = REFTRACK_HDR(p);                    \
+#define DECL_REMOVEREF(S, DTOR)                                         \
+    static inline void S##_removeref(const struct S *const p) {         \
+        if (!p)                                                         \
+            return;                                                     \
                                                                         \
-            if (REFCOUNT_DEC_READ(rtp->rc)){                            \
-                REFTRACK_TRACE_LOG(pr_info("reftrack:free object:%p: type:%s:\n",p,#S)); \
-                do{ DTOR((struct S*)p); }while(0);                      \
-                rc_kvfree((void*)p);                                    \
-            }                                                           \
+        if (!mark_found(p)) {                                           \
+            pr_warn("reftrack: Invalid pointer/use-after-free |0x%p| to |%s_removeref|\n", p, #S); \
+            return;                                                     \
         }                                                               \
+        REFTRACK_TRACE_LOG(pr_info("%s:|0x%p|:-1n", #S, p));            \
+        reftrack_t *const rtp = REFTRACK_HDR(p);                        \
+                                                                        \
+        if (REFCOUNT_DEC_READ(rtp->rc)){                                \
+            REFTRACK_TRACE_LOG(pr_info("reftrack:free object:%p: type:%s:\n",p,#S)); \
+            do{ DTOR((struct S*)p); }while(0);                          \
+            rc_kvfree((void*)p);                                        \
+        }                                                               \
+                                                                        \
     }
 
 #define REFTRACK_STRUCT(S)                      \
@@ -298,38 +332,46 @@ rc_free_helper_(void *p, void (*const free_fn)(const void *)
  * Default implementation of addref & removeref functions.
  */
 
-noinline void reftrack_addref(const void *const p) {
-    if (p){
-        if (!mark_found(p)){
-            pr_warn("reftrack: Invalid pointer/use-after-free |0x%p|\n", p);
-            return;
-        }
+static void reftrack_addref(const void *const);
 
-        REFCOUNT_INC(REFTRACK_COUNTER(p));
-        REFTRACK_TRACE_LOG(pr_info("reftrack:|0x%p|:+1\n", p));
+static inline void reftrack_addref(const void *const p) {
+    
+    if (!p)
+        return;
+
+    if (!mark_found(p)){
+        pr_warn("reftrack: Invalid pointer/use-after-free |0x%p|\n", p);
+        return;
     }
+
+    REFCOUNT_INC(REFTRACK_COUNTER(p));
+    REFTRACK_TRACE_LOG(pr_info("reftrack:|0x%p|:+1\n", p));
 
 }
 
-noinline void reftrack_removeref(const void *const p) {
+static void reftrack_removeref(const void *const);
 
-    if (p) {
-        if (!mark_found(p)){
-            pr_warn("reftrack: Invalid pointer/use-after-free |0x%p|\n", p);
-            return;
-        }
+static inline void reftrack_removeref(const void *const p) {
 
-        REFTRACK_TRACE_LOG(pr_info("reftrack:|0x%p|:-1\n", p));
-        reftrack_t *const rtp = REFTRACK_HDR(p);
+    if (!p)
+        return;
 
-        /* checking for one as the value before decrement to zero is one */
-        if (REFCOUNT_DEC_READ(rtp->rc)){
-            REFTRACK_DEBUG_LOG(pr_info("reftrack: releasing object |0x%p|\n", p));
-            void (*dtor)(void *) = REFTRACK_DTOR(rtp);
-            if (dtor) dtor((void*)p);
-            rc_kvfree((void*)p);
-        }
+    if (!mark_found(p)){
+        pr_warn("reftrack: Invalid pointer/use-after-free |0x%p|\n", p);
+        return;
     }
+
+    REFTRACK_TRACE_LOG(pr_info("reftrack:|0x%p|:-1\n", p));
+    reftrack_t *const rtp = REFTRACK_HDR(p);
+
+    /* checking for one as the value before decrement to zero is one */
+    if (REFCOUNT_DEC_READ(rtp->rc)){
+        REFTRACK_DEBUG_LOG(pr_info("reftrack: releasing object |0x%p|\n", p));
+        void (*dtor)(void *) = REFTRACK_DTOR(rtp);
+        if (dtor) dtor((void*)p);
+        rc_kvfree((void*)p);
+    }
+
 }
 
 #ifdef REFTRACK_REPLACE_ALL
