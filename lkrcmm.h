@@ -237,8 +237,8 @@ REFTRACK_IGNORE static void
 rc_free_helper_(void *p, void (*const free_fn)(const void *)
                 REFTRACK_DEBUG_PARAMS_DECL){
 
-	if(!p)
-        return;
+	if(!p || !mark_found(p))
+            return;
 
     reftrack_t *rtp = REFTRACK_HDR(p);
 
