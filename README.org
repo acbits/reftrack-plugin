@@ -142,7 +142,8 @@ Functions that change the attributes or size of an allocated memory like /=reall
 This attribute is useful only if you are implementing a custom GC solution. In all other cases, it might not be necessary. 
 
 ** Usage within Linux kernel
-TODO The header file requires more testing.
+The header file requires more testing. Compiles with 6.9
+
 ** Limitations
 + Array of tracked pointers is currently unsupported. Look at /array2.c/ example in
    the =testcases= directory for a way to handle them.
