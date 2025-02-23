@@ -254,7 +254,7 @@ void reftrack_addref_(const void *const p, const char *type_name) {
 UNUSED static void *reftrack_alloc(size_t n) { return rc_malloc(n); }
 #line 1
 UNUSED static void reftrack_free(void *p){ rc_free(p); }
-#line 238
+#line 258
 
 UNUSED void reftrack_addref(const void *const p) {
     reftrack_addref_(p, "");
