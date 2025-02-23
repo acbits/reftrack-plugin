@@ -34,7 +34,12 @@ These are the minimum arguments required.
 
 ## Plugin arguments
 
-TODO
+- addref default addref function.
+- removeref default removeref function.
+
+These two functions should have the signature like
+`void fn(const void *const);` and needs to be specified only for cases
+where a custom implementation of memory management is preferred.
 
 ## Usage
 
@@ -187,7 +192,7 @@ other cases, it might not be necessary.
 
 ## Usage within Linux kernel
 
-TODO The header file requires more testing.
+Work in progress. Tested against the staging tree.
 
 ## Limitations
 

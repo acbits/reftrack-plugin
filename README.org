@@ -20,7 +20,11 @@ All test cases should pass.
 Add ~-fplugin=/usr/lib64/reftrack.so -I/usr/include/reftrack -fplugin-arg-reftrack-addref=reftrack_addref
 	-fplugin-arg-reftrack-removeref=reftrack_removeref~ to =CFLAGS=. These are the minimum arguments required.
 ** Plugin arguments
-TODO
++ addref default addref function.
++ removeref default removeref function.
+ 
+These two functions should have the signature like =void fn(const void *const);= and needs to be specified only for cases where a custom implementation of memory
+management is preferred.
 
 ** Usage
 First step is to tag the structure that needs to be tracked.
@@ -142,7 +146,8 @@ Functions that change the attributes or size of an allocated memory like /=reall
 This attribute is useful only if you are implementing a custom GC solution. In all other cases, it might not be necessary. 
 
 ** Usage within Linux kernel
-The header file requires more testing. Compiles with 6.9
+
+Work in progress. Tested against the staging tree. 
 
 ** Limitations
 + Array of tracked pointers is currently unsupported. Look at /array2.c/ example in
