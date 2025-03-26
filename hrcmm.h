@@ -282,9 +282,9 @@ UNUSED void reftrack_removeref(const void *const p) {
     static void S##_removeref(const struct S *const);
 
 
-#define DECL_ADDREF(S) void S##_addref(const struct S *const p) { reftrack_addref_(p, #S); }
+#define DEF_ADDREF(S) void S##_addref(const struct S *const p) { reftrack_addref_(p, #S); }
 
-#define DECL_REMOVEREF(S,DTOR)                                          \
+#define DEF_REMOVEREF(S,DTOR)                                          \
     void S##_removeref(const struct S *const p) {                       \
         if (!p || !mark_found(p, __func__))                             \
             return;                                                     \
@@ -316,14 +316,14 @@ UNUSED void reftrack_removeref(const void *const p) {
 
 #define REFTRACK_EPILOG(S)                      \
     REFTRACK_DECL_CTOR(S)                       \
-    DECL_ADDREF(S)                              \
-    DECL_REMOVEREF(S, REFTRACK_NOP)
+    DEF_ADDREF(S)                               \
+    DEF_REMOVEREF(S, REFTRACK_NOP)
 
 #define REFTRACK_EPILOG_WITH_DTOR(S)                                    \
     REFTRACK_DECL_CTOR(S)                                               \
-    DECL_ADDREF(S)                                                      \
+    DEF_ADDREF(S)                                                       \
     REFTRACK_DESTRUCTOR_FN static void S##_destroy(struct S *const);    \
-    DECL_REMOVEREF(S, S##_destroy)
+    DEF_REMOVEREF(S, S##_destroy)
 
 UNUSED static void print_mem_stats(){
 
