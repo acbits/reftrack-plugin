@@ -315,12 +315,10 @@ UNUSED void reftrack_removeref(const void *const p) {
     struct REFTRACK_CUSTOM(S) S
 
 #define REFTRACK_EPILOG(S)                      \
-    REFTRACK_DEF_CTOR(S)                       \
     DEF_ADDREF(S)                               \
     DEF_REMOVEREF(S, REFTRACK_NOP)
 
 #define REFTRACK_EPILOG_WITH_DTOR(S)                                    \
-    REFTRACK_DEF_CTOR(S)                                               \
     DEF_ADDREF(S)                                                       \
     REFTRACK_DESTRUCTOR_FN static void S##_destroy(struct S *const);    \
     DEF_REMOVEREF(S, S##_destroy)
