@@ -304,10 +304,10 @@ UNUSED void reftrack_removeref(const void *const p) {
  * sample implementation of a constructor for struct with NO flexible arrays.
  */
 #define REFTRACK_DEF_CTOR(S)                           \
-    struct S *S##_create() {                            \
-        void *const p = rc_malloc(sizeof(struct S));    \
-        memset(p, 0, sizeof(struct S));                 \
-        return p;                                       \
+    static inline struct S *S##_create() {             \
+        void *const p = rc_malloc(sizeof(struct S));   \
+        memset(p, 0, sizeof(struct S));                \
+        return p;                                      \
     }
 
 #define REFTRACK_STRUCT(S)                      \
