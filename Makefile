@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (C) 2023 Aravind Ceyardass (dev@aravind.cc)
+# Copyright (C) 2023-2025 Aravind Ceyardass (dev@aravind.cc)
 
 # reftrack plugin Makefile
 # Requires GNU Make >= 4.2.1
@@ -15,12 +15,13 @@ INCLUDE_DIR := $(PREFIX)/include
 
 TARGET_OBJ := reftrack.so
 
-GCCPLUGINS_DIR := $(shell $(CC) -print-file-name=plugin)
-CXXFLAGS += -Wall -I$(GCCPLUGINS_DIR)/include -fPIC -fno-rtti  -g
+GCCPLUGINS_DIR := $(shell $(CXX) -print-file-name=plugin)
+CXXFLAGS += -Wall -lstdc++ -I$(GCCPLUGINS_DIR)/include \
+	-fPIC -fno-rtti -O2 -shared -std=c++14
 
-
+CXX_EXTRA_FLAGS :=
 $(TARGET_OBJ): $(PLUGIN_SOURCE_FILES)
-	$(CXX)  -O3 -shared -std=c++14 $(CXXFLAGS) $< -o $@
+	$(CXX)  $(CXXFLAGS) $(CXX_EXTRA_FLAGS) $< -o $@
 
 
 all: ${TARGET_OBJ}
