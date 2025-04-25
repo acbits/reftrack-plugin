@@ -10,6 +10,8 @@ REFTRACK_STRUCT(S) { int im; };
 
 REFTRACK_EPILOG(S);
 
+REFTRACK_DEF_CTOR(S);
+
 typedef struct S S;
 
 void set_S(S *p){

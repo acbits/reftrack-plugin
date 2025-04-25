@@ -12,6 +12,8 @@ REFTRACK_STRUCT(R){
 };
 
 REFTRACK_EPILOG_WITH_DTOR(R);
+REFTRACK_DEF_CTOR(R);
+
 typedef struct R R;
 
 void R_destroy(struct R *p){
@@ -24,6 +26,7 @@ REFTRACK_STRUCT(P){
 };
 
 REFTRACK_EPILOG_WITH_DTOR(P);
+REFTRACK_DEF_CTOR(P);
 
 typedef struct P P;
 
@@ -49,11 +52,11 @@ static inline void foo(P *p){
         s.pp = a;
         {
             printf("{B} ENTER\n");
-            
+
             P *c = s.pp;
             c->pr = R_create();
             c->pr->im = 0xbeef;
-            
+
             printf("{B} EXIT\n");
         }
         printf("{A} EXIT\n");
@@ -65,7 +68,7 @@ static inline void foo(P *p){
 int main(int argc, char *argv[]){
     atexit(print_mem_stats);
     P *p = P_create();
-    
+
     foo(p);
     
     printf("%x\n", p->pr->im);

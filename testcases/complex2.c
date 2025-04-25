@@ -12,6 +12,8 @@ REFTRACK_STRUCT(R){
 };
 
 REFTRACK_EPILOG_WITH_DTOR(R);
+REFTRACK_DEF_CTOR(R);
+
 typedef struct R R;
 
 void R_destroy(struct R *p){
@@ -24,6 +26,8 @@ REFTRACK_STRUCT(P){
 };
 
 REFTRACK_EPILOG_WITH_DTOR(P);
+REFTRACK_DEF_CTOR(P);
+
 
 typedef struct P P;
 

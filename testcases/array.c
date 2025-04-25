@@ -12,8 +12,8 @@ struct REFTRACK_CUSTOM(R) R {
     int im;
 };
 
-REFTRACK_EPILOG(R)
-
+REFTRACK_EPILOG(R);
+REFTRACK_DEF_CTOR(R);
 
 typedef struct R R;
 

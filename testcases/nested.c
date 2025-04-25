@@ -13,6 +13,7 @@ struct REFTRACK_CUSTOM(A) A {
 };
 
 REFTRACK_EPILOG_WITH_DTOR(A);
+REFTRACK_DEF_CTOR(A);
 
 typedef struct A A;
 
@@ -24,6 +25,7 @@ struct REFTRACK_CUSTOM(B) B{
 };
 
 REFTRACK_EPILOG_WITH_DTOR(B);
+REFTRACK_DEF_CTOR(B);
 
 typedef struct B B;
 
