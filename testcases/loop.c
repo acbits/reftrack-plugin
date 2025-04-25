@@ -12,7 +12,7 @@ struct REFTRACK_CUSTOM(R) R {
     int im;
 };
 
-REFTRACK_EPILOG(R)
+REFTRACK_EPILOG(R);
 
 
 typedef struct R R;

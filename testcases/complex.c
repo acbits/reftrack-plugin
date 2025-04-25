@@ -23,7 +23,6 @@ struct C {
     struct R *rp;
 };
 
-//R *srp;
 
 R *foo(R2 *p, int k){
     p->im++;
@@ -36,7 +35,7 @@ R *foo(R2 *p, int k){
         obp = p;
         p1->im=0xab;
         p1 = p1;
-        // pa[3] = p1;
+
     }
     printf("foo:RC:%d\n", REFTRACK_COUNT(p));
     return p;
@@ -47,7 +46,7 @@ int even(R *p, int i){
     
 	if (i & 1){
         rp = p;
-        //srp = rp;
+
 		return 0;
     }
 	else{
