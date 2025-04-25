@@ -13,6 +13,7 @@ Copyright (C) 2023 Aravind Ceyardass (dev@aravind.cc)
 #include <stdbool.h>
 #include <assert.h>
 #include <stdatomic.h>
+#include <string.h>
 #include "reftrack.h"
 
 #ifdef REFTRACK_DEBUG
@@ -20,7 +21,8 @@ Copyright (C) 2023 Aravind Ceyardass (dev@aravind.cc)
 #endif
 
 #define REFTRACK_MARKER 0xfacebeef
-#define UNUSED __attribute__((unused))
+#define UNUSED   __attribute__((unused))
+#define NOINLINE __attribute__((noinline))
 
 typedef atomic_int refcount_t;
 
@@ -66,7 +68,7 @@ typedef void *(*allocator_t)(size_t);
 #ifdef REFTRACK_USE_MARK
 #define REFTRACK_SET_MARK(p, v) do{ (p)->mark = v; } while(0)
 
-static bool mark_found(const void *p, const char *const fname){
+static inline bool mark_found(const void *p, const char *const fname){
     if (!p)
         return false;
 
@@ -242,7 +244,7 @@ rc_free_helper_(const void *p, void (*const free_fn)(void *)
 #define rc_free(p)       rc_free_helper_(p, free REFTRACK_DEBUG_ARGS)
 
 
-void reftrack_addref_(const void *const p, const char *type_name) {
+static inline void reftrack_addref_(const void *const p, const char *type_name) {
     if (!p || !mark_found(p, __func__))
         return;
 
@@ -251,16 +253,16 @@ void reftrack_addref_(const void *const p, const char *type_name) {
 }
 
 #line 1
-UNUSED static void *reftrack_alloc(size_t n) { return rc_malloc(n); }
+UNUSED static inline void *reftrack_alloc(size_t n) { return rc_malloc(n); }
 #line 1
-UNUSED static void reftrack_free(void *p){ rc_free(p); }
-#line 258
+UNUSED static inline void reftrack_free(void *p){ rc_free(p); }
+#line 260
 
-UNUSED void reftrack_addref(const void *const p) {
+UNUSED static inline void reftrack_addref(const void *const p) {
     reftrack_addref_(p, "");
 }
 
-UNUSED void reftrack_removeref(const void *const p) {
+UNUSED NOINLINE static void reftrack_removeref(const void *const p) {
 
     const char *const ctx = __func__;
 
@@ -269,7 +271,7 @@ UNUSED void reftrack_removeref(const void *const p) {
 
     REFTRACK_TRACE_LOG(printf("reftrack:|0x%p|:-1\n", p));
     reftrack_t *const rtp = REFTRACK_HDR(p);
-    /* checking for one as the value before decrement to zero is one */
+
     if (REFCOUNT_DEC(rtp->rc) == 1){
         REFTRACK_DEBUG_LOG(printf("reftrack: releasing object |0x%p|\n", p));
         rc_free((void*)p);
@@ -285,12 +287,13 @@ UNUSED void reftrack_removeref(const void *const p) {
 #define DEF_ADDREF(S) void S##_addref(const struct S *const p) { reftrack_addref_(p, #S); }
 
 #define DEF_REMOVEREF(S,DTOR)                                          \
-    void S##_removeref(const struct S *const p) {                       \
+    NOINLINE void S##_removeref(const struct S *const p) {              \
         if (!p || !mark_found(p, __func__))                             \
             return;                                                     \
+                                                                        \
         REFTRACK_TRACE_LOG(printf("reftrack:%s:|0x%p|:-1\n", #S, p));   \
         reftrack_t *const rtp = REFTRACK_HDR(p);                        \
-        /* checking for one as the value before decrement to zero is one */ \
+                                                                        \
         if (REFCOUNT_DEC(rtp->rc) == 1){                                \
             REFTRACK_DEBUG_LOG(printf("reftrack: releasing object |0x%p| type |%s|\n", p, #S)); \
             do{ DTOR((struct S*)p); }while(0);                          \
@@ -320,7 +323,7 @@ UNUSED void reftrack_removeref(const void *const p) {
 
 #define REFTRACK_EPILOG_WITH_DTOR(S)                                    \
     DEF_ADDREF(S)                                                       \
-    REFTRACK_DESTRUCTOR_FN static void S##_destroy(struct S *const);    \
+    REFTRACK_DESTRUCTOR_FN extern void S##_destroy(struct S *const);    \
     DEF_REMOVEREF(S, S##_destroy)
 
 UNUSED static void print_mem_stats(){
