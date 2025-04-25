@@ -27,12 +27,14 @@ TARGETS := sample \
 		calloc \
 		hash_test \
 		block_test \
-		dual_param
+		dual_param \
+		multifile
 
 TARGET_OBJS := $(foreach t, ${TARGETS}, ${t}.o)
 
 CC ?= gcc
-REFTRACK_CFLAGS := -fplugin=${TOPDIR}/reftrack.so \
+
+REFTRACK_CFLAGS :=  -fplugin=${TOPDIR}/reftrack.so \
 	-fplugin-arg-reftrack-log_level=5 \
 	-fplugin-arg-reftrack-alloc=reftrack_alloc \
 	-fplugin-arg-reftrack-free=reftrack_free \
@@ -52,6 +54,9 @@ all: ${TARGETS}
 .PHONY: help
 help:
 	@echo -e "\nAvailable targets: ${TARGETS}\nTarget objects: ${TARGET_OBJS}"
+
+multifile: multifile1.o multifile2.o
+	$(CC) $(CFLAGS) -o $@  $^
 
 run: all
 	run_test () { \
@@ -73,4 +78,4 @@ run: all
 
 .PHONY: clean
 clean:
-	rm -f ${TARGETS} ${TARGET_OBJS}
+	rm -f ${TARGETS} *.o ${TARGET_OBJS}
