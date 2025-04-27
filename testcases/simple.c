@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#define REFTRACK_DEBUG
 #define REFTRACK_TRACE
 
 #include "hrcmm.h"
