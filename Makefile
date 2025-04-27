@@ -17,7 +17,7 @@ TARGET_OBJ := reftrack.so
 
 GCCPLUGINS_DIR := $(shell $(CXX) -print-file-name=plugin)
 CXXFLAGS += -Wall -lstdc++ -I$(GCCPLUGINS_DIR)/include \
-	-fPIC -fno-rtti -O2 -shared -std=c++14
+	-fPIC -fno-rtti -O2 -shared -std=c++17
 
 CXX_EXTRA_FLAGS :=
 $(TARGET_OBJ): $(PLUGIN_SOURCE_FILES)
