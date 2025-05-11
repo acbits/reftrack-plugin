@@ -58,7 +58,7 @@ int plugin_is_GPL_compatible;
 #define LOG(L, ...)                                                     \
     do {                                                                \
         if (logging(L))                                                 \
-            log(L, __VA_ARGS__);                                        \
+            log(L, {__VA_ARGS__});                                      \
     } while(0)
 
 namespace reftrack {
@@ -75,8 +75,6 @@ namespace reftrack {
 
 
     enum log_level {TRACE = 1, DEBUG, WARN, INFO, ERROR};
-
-    static void log(log_level level, const std::vector<xstring>& v, const string delim);
 
     const char PLUGIN_NAME[] = "reftrack";
 
@@ -226,11 +224,17 @@ namespace reftrack {
 
     static inline bool logging(log_level l){ return l >= G.cur_log_level;}
 
-    static inline void log(log_level level, const std::vector<xstring>& v, const string delim=" "){
+    static inline void log(log_level level, const vector<xstring>& arg_list){
 
         if (logging(level)){
+            bool first = true;
 
-            for_each(cbegin(v), cend(v), [&](const auto& s){ cout << s << delim;});
+            for(const auto& x : arg_list){
+                if (!first) { cout << ' '; }
+                cout << x;
+                first = false;
+            }
+
             cout << G.nl;
         }
     }
@@ -337,7 +341,7 @@ namespace reftrack {
         auto et = decl_type_context(t);
 
         if (0 && et && IS_TYPE_OR_DECL_P(et)){
-            auto & etype_ID = DECL_NAME(et);
+            auto& etype_ID = DECL_NAME(et);
 
             const char *name =
                 (etype_ID ? IDENTIFIER_POINTER(etype_ID) : "");
@@ -413,7 +417,7 @@ namespace reftrack {
 
         if (get_fn_attr_value(fn, attr_value) && (attr_value & REFTRACK_HEAP_FN_FLAG)){
             rv = true;
-            LOG(TRACE, {function_name(fn), int(attr_value), ":heap function"});
+            LOG(TRACE, function_name(fn), int(attr_value), ":heap function");
         }
 
         return rv;
@@ -518,14 +522,14 @@ namespace reftrack {
 
         for (auto subblock = BLOCK_SUBBLOCKS(block); subblock;
              subblock = BLOCK_CHAIN(subblock)){
-            LOG(TRACE, { "Subblock:"});
+            LOG(TRACE,  "Subblock:");
 
             for_each_block(subblock, block, visitor);
         }
 
         auto next_block = BLOCK_CHAIN(block);
         if (next_block){
-            LOG(TRACE, { "block:"});
+            LOG(TRACE,  "block:");
             for_each_block(next_block, parent, visitor);
         }
     }
@@ -539,17 +543,17 @@ namespace reftrack {
     }
 
     static int process_block_vars(tree block){
-        LOG(TRACE, {"\nBlock variables:{"});
+        LOG(TRACE, "\nBlock variables:{");
         auto var_count = 0;
 
         auto var_visitor = [&](auto block_var){
-            LOG(TRACE, { symbol_name(block_var), ':', c_type_name(TREE_TYPE(block_var)), ' '});
+            LOG(TRACE,  symbol_name(block_var), ':', c_type_name(TREE_TYPE(block_var)), ' ');
             var_count++;
         };
 
         for_each_block_var(block, var_visitor);
 
-        LOG(TRACE, { var_count, "}"});
+        LOG(TRACE,  var_count, "}");
         return var_count;
     }
 
@@ -580,14 +584,14 @@ namespace reftrack {
                     gimple_seq_add_stmt(&gseq, tmp_assign);
 
                     var = tmp_var;
-                    LOG(TRACE, {"Temporary:", symbol_info(tmp_var)});
+                    LOG(TRACE, "Temporary:", symbol_info(tmp_var));
                 }
                 auto call = gimple_build_call(entry.fn, 1, var);
 
                 gimple_set_location(call, loc ? loc : UNKNOWN_LOCATION);
                 if (block) gimple_set_block(call, block);
                 update_stmt(call);
-                LOG(TRACE, {"Adding refcall at", ((loc ? LOCATION_LINE(loc) : -1)), symbol_info(entry.var)});
+                LOG(TRACE, "Adding refcall at", ((loc ? LOCATION_LINE(loc) : -1)), symbol_info(entry.var));
 
                 gimple_seq_add_stmt(&gseq, call);
             }
@@ -605,7 +609,7 @@ namespace reftrack {
     static bool is_valid_destructor_fn(const_tree fn){
 
         if (TREE_CODE(fn) != FUNCTION_DECL){
-            LOG(TRACE, {"Not a function"});
+            LOG(TRACE, "Not a function");
             return false;
         }
 
@@ -613,7 +617,7 @@ namespace reftrack {
         auto fn_result = TREE_TYPE(fn);
 
         if (!VOID_TYPE_P(TREE_TYPE(fn_result))){
-            LOG(TRACE, {"Not void return type"});
+            LOG(TRACE, "Not void return type");
             return false;
         }
 
@@ -623,7 +627,7 @@ namespace reftrack {
         for(; fnp; fnp = DECL_CHAIN(fnp)) param_count++;
 
         if (param_count != 1){
-            LOG(TRACE, {"params != 1", param_count});
+            LOG(TRACE, "params != 1", param_count);
             return false;
         }
 
@@ -645,7 +649,7 @@ namespace reftrack {
             if (is_pointer_to(TREE_TYPE(fnp), void_type_node, TYPE_QUAL_CONST))
                 valid_param++;
             else
-                LOG(TRACE, {c_type_name(TREE_TYPE(fnp)), "!=", c_type_name(void_type_node)});
+                LOG(TRACE, c_type_name(TREE_TYPE(fnp)), "!=", c_type_name(void_type_node));
 
         }
 
@@ -670,7 +674,7 @@ namespace reftrack {
             if (is_pointer_to(TREE_TYPE(fnp), target_type, TYPE_QUAL_CONST))
                 valid_param++;
             else
-                LOG(TRACE, {c_type_name(TREE_TYPE(fnp)), "!=", c_type_name(target_type)});
+                LOG(TRACE, c_type_name(TREE_TYPE(fnp)), "!=", c_type_name(target_type));
 
         }
 
@@ -692,19 +696,19 @@ namespace reftrack {
             if (G.reftrack_alloc_fn_name == fun_name){
                 G.reftrack_alloc_fn = fun;
                 G.orig_alloc_fn = G.get_tree(G.orig_alloc_fn_name);
-                LOG(DEBUG, {"Alloc functions:", get_name(G.reftrack_alloc_fn),
-                        get_name(G.orig_alloc_fn)});
+                LOG(DEBUG, "Alloc functions:", get_name(G.reftrack_alloc_fn),
+                        get_name(G.orig_alloc_fn));
             }
             else if (G.reftrack_free_fn_name == fun_name){
                 G.reftrack_free_fn = fun;
                 G.orig_free_fn = G.get_tree(G.orig_free_fn_name);
-                LOG(DEBUG, {"Free functions:", get_name(G.reftrack_free_fn),
-                        get_name(G.orig_free_fn)});
+                LOG(DEBUG, "Free functions:", get_name(G.reftrack_free_fn),
+                        get_name(G.orig_free_fn));
             }
             else if (G.default_addref_fn_name == fun_name){
                 if (is_valid_default_ref_fn(fun)){
                     G.default_addref_fn = fun;
-                    LOG(DEBUG, {"Given default addref function:", fun_name});
+                    LOG(DEBUG, "Given default addref function:", fun_name);
                 }
                 else{
                     error("Invalid default addref function");
@@ -713,7 +717,7 @@ namespace reftrack {
             else if (G.default_removeref_fn_name == fun_name){
                 if (is_valid_default_ref_fn(fun)){
                     G.default_removeref_fn = fun;
-                    LOG(DEBUG, {"Given default removeref function:", fun_name});
+                    LOG(DEBUG, "Given default removeref function:", fun_name);
                 }
                 else{
                     error("Invalid default removeref function");
@@ -750,9 +754,9 @@ namespace reftrack {
     static void gcc_finish_cb(void *gcc_data, void *user_data) {
 
         for (const auto &e : G.fn_list) {
-            LOG(TRACE, {e});
+            LOG(TRACE, e);
         }
-        LOG(TRACE, { "#pass:", G.pass});
+        LOG(TRACE,  "#pass:", G.pass);
     }
 
     ////////////////////////////////////////////////////////////
@@ -762,7 +766,7 @@ namespace reftrack {
             return;
 
         if (G.debug){
-            LOG(TRACE, {"struct:", type_name(t)});
+            LOG(TRACE, "struct:", type_name(t));
         }
 
         for (auto field = TYPE_FIELDS(t); field; field = TREE_CHAIN(field)){
@@ -770,7 +774,7 @@ namespace reftrack {
             if (G.refcount_fields.find(field) != G.refcount_fields.end()){
 
                 if (G.debug){
-                    LOG(DEBUG, { c_type_name(t), "->", symbol_name(field)});
+                    LOG(DEBUG,  c_type_name(t), "->", symbol_name(field));
                 }
             }
         }
@@ -787,18 +791,18 @@ namespace reftrack {
         collect_struct_with_rc(t);
 
         if (G.debug){
-            LOG(DEBUG, { "Parse type :", c_type_name(t), " : {"});
+            LOG(DEBUG,  "Parse type :", c_type_name(t), " : {");
 
             for (auto field = TYPE_FIELDS(t); field; field = TREE_CHAIN(field)){
-                LOG(DEBUG, {symbol_name(field), ':', c_type_name(TREE_TYPE(field))," @["});
+                LOG(DEBUG, symbol_name(field), ':', c_type_name(TREE_TYPE(field))," @[");
                 for(auto fa = DECL_ATTRIBUTES(field); fa; fa = TREE_CHAIN(fa)){
-                    LOG(DEBUG, {attr_name(fa), ' '});
+                    LOG(DEBUG, attr_name(fa), ' ');
                 }
-                LOG(DEBUG, {"] "});
+                LOG(DEBUG, "] ");
 
             }
 
-            LOG(DEBUG, {'}'});
+            LOG(DEBUG, '}');
         }
 
     }
@@ -808,10 +812,10 @@ namespace reftrack {
         auto cp = current_pass;
         auto tp = (tree) (gcc_data);
         if (tp) {
-            LOG(DEBUG, {"Tree type:",TREE_TYPE(tp),',', TREE_CODE(tp)});
+            LOG(DEBUG, "Tree type:",TREE_TYPE(tp),',', TREE_CODE(tp));
 
         }
-        LOG(DEBUG, {"Early gimple:", (cp ? cp->name : "<null>")});
+        LOG(DEBUG, "Early gimple:", (cp ? cp->name : "<null>"));
 
     }
 
@@ -822,7 +826,7 @@ namespace reftrack {
         gp->pass++;
 
         if (p) {
-            LOG(DEBUG, {"Pass:", p->name,", type:",  p->type});
+            LOG(DEBUG, "Pass:", p->name,", type:",  p->type);
         }
 
     }
@@ -869,8 +873,8 @@ namespace reftrack {
                 else {
                     G.ref_structs[*node] = {afn, rfn, build_pointer_type(*node)};
                     if (G.debug){
-                        LOG(INFO, {"Tracking struct", c_type_name(*node), "using", function_name(afn), ",",
-                                function_name(rfn)});
+                        LOG(INFO, "Tracking struct", c_type_name(*node), "using", function_name(afn), ",",
+                                function_name(rfn));
                     }
                 }
             }
@@ -892,9 +896,9 @@ namespace reftrack {
 
                     if (G.debug){
 
-                        LOG(INFO, {"Tracking struct",
+                        LOG(INFO, "Tracking struct",
                                 c_type_name(*node), "using",
-                                function_name(fn1), ",",  function_name(fn2)});
+                                function_name(fn1), ",",  function_name(fn2));
 
                     }
                 }
@@ -923,7 +927,7 @@ namespace reftrack {
             case REFTRACK_IGNORE_FLAG:
 
                 G.ignored_fns.insert(*node);
-                LOG(WARN, {"Ignoring function:", get_name(*node)});
+                LOG(WARN, "Ignoring function:", get_name(*node));
                 break;
 
             default:
@@ -1138,7 +1142,7 @@ namespace reftrack {
 
         void add_assignment(tree var, tree rhs){
 
-            LOG(TRACE, {symbol_name(var),"=", symbol_name(rhs)});
+            LOG(TRACE, symbol_name(var),"=", symbol_name(rhs));
             bb_assigned[var] = rhs;
             initialized.insert(var);
         }
@@ -1177,11 +1181,11 @@ namespace reftrack {
     ////////////////////////////////////////////////////////////
     int reftrack_pass::handle_gimple_bind(function *fn, gimple_stmt_iterator& gsi, gimple_seq stmt){
 
-        LOG(TRACE, {"Gimple bind"});
+        LOG(TRACE, "Gimple bind");
         auto vars  = gimple_bind_vars(dyn_cast<gbind*>(stmt));
 
         for(; vars; vars = TREE_CHAIN(vars)){
-            LOG(TRACE, {gimple_loc_str(stmt),"Symbol:[", symbol_name(vars),"] ", c_type_name(TREE_TYPE(vars))});
+            LOG(TRACE, gimple_loc_str(stmt),"Symbol:[", symbol_name(vars),"] ", c_type_name(TREE_TYPE(vars)));
         }
 
         return 0;
@@ -1223,7 +1227,7 @@ namespace reftrack {
         if (EXPR_P(lhs)){
             auto old_lhs = lhs;
             lhs = force_gimple_operand_gsi(&gsi, lhs, true, nullptr, true, GSI_SAME_STMT);
-            LOG(TRACE, {"Unfold LHS", gimple_loc_str(stmt), symbol_name(old_lhs), symbol_name(lhs)});
+            LOG(TRACE, "Unfold LHS", gimple_loc_str(stmt), symbol_name(old_lhs), symbol_name(lhs));
         }
 
 
@@ -1244,7 +1248,7 @@ namespace reftrack {
             auto new_assign = gimple_build_assign(lhs, tmp_var); // A=T
             gimple_seq_add_stmt(&new_stmts, new_assign);
             gsi_insert_seq_after(&gsi, new_stmts, GSI_CONTINUE_LINKING);
-            LOG(TRACE, {"Transform A=B+C+D for", gimple_loc_str(stmt), symbol_name(lhs)});
+            LOG(TRACE, "Transform A=B+C+D for", gimple_loc_str(stmt), symbol_name(lhs));
         }
         else{
 
@@ -1278,21 +1282,21 @@ namespace reftrack {
         auto lhs_arginfo = is_tracked_struct(TREE_TYPE(lhs));
 
         if (!lhs_arginfo) {
-            LOG(TRACE, {loc, "Skip", symbol_info(lhs)});
+            LOG(TRACE, loc, "Skip", symbol_info(lhs));
             return 0;
         }
 
-        LOG(TRACE, {loc, "LHS:", symbol_info(lhs)});
+        LOG(TRACE, loc, "LHS:", symbol_info(lhs));
 
         if (is_generated(lhs)
             && !is_component(lhs)
             && !EXPR_P(lhs)){ // case A.2/A.3
-            LOG(TRACE, {loc, "A.2/A.3", symbol_info(lhs)});
+            LOG(TRACE, loc, "A.2/A.3", symbol_info(lhs));
             return 0;
         }
 
         if (is_array_elem(lhs)){
-            LOG(INFO, {loc, "array types are not supported"});
+            LOG(INFO, loc, "array types are not supported");
             return 0;
         }
 
@@ -1306,8 +1310,8 @@ namespace reftrack {
         if (!null_value(rhs)){
             auto rhs_arginfo = is_tracked_struct(TREE_TYPE(rhs));
 
-            LOG(TRACE, {loc, "RHS:", "Code:", tree_code_str(gimple_assign_rhs_code(stmt)),
-                    symbol_info(rhs), symbol_info(rhs2), symbol_info(rhs3)});
+            LOG(TRACE, loc, "RHS:", "Code:", tree_code_str(gimple_assign_rhs_code(stmt)),
+                    symbol_info(rhs), symbol_info(rhs2), symbol_info(rhs3));
 
             if (rhs_arginfo){
                 addref_fn = rhs_arginfo->ref_add_fn;
@@ -1336,12 +1340,12 @@ namespace reftrack {
         auto callee = gimple_call_fndecl(stmt);
 
         if (!callee){
-            LOG(TRACE, {"Callee is null", function_name(fn), ":", gimple_loc_str(stmt)});
+            LOG(TRACE, "Callee is null", function_name(fn), ":", gimple_loc_str(stmt));
             return 1;
         }
 
         location_t loc = gimple_location(stmt);
-        LOG(TRACE, {"call_fn:", callee, symbol_info(callee)});
+        LOG(TRACE, "call_fn:", callee, symbol_info(callee));
 
         vector<gimple_build_info> tracked_args, call_lhs_epilog_args;
 
@@ -1354,9 +1358,9 @@ namespace reftrack {
 
 
         if (!skip_function(callee) && !is_destructor(callee)){
-            LOG(TRACE, {symbol_name(callee),
+            LOG(TRACE, symbol_name(callee),
                     "#arg:",
-                    (size_t)(arg_count)});
+                    (size_t)(arg_count));
 
             for(unsigned ai = 0; ai < arg_count; ai++) {
 
@@ -1382,7 +1386,7 @@ namespace reftrack {
         }
 
 
-        LOG(TRACE, {loc_str, symbol_info(call_lhs)});
+        LOG(TRACE, loc_str, symbol_info(call_lhs));
 
         if (call_lhs && is_heap_function(callee) && is_call_arg(call_lhs, call))
             return 0;
@@ -1391,7 +1395,7 @@ namespace reftrack {
             (!is_generated(call_lhs)
              || (is_generated(call_lhs) && is_component(call_lhs) ))){
 
-            LOG(TRACE, {"CALL LHS:", symbol_info(call_lhs)});
+            LOG(TRACE, "CALL LHS:", symbol_info(call_lhs));
 
             if (emit_removeref_p(call_lhs)){
                 tracked_args.push_back({GIMPLE_CALL, loc,lhs_arginfo->ref_remove_fn, call_lhs,
@@ -1429,7 +1433,7 @@ namespace reftrack {
         init(fn);
 
         if (G.debug){
-            LOG(TRACE,{horiz_line,"\ninstrument_gseq():", function_name(fn->decl), "\n", horiz_line},"");
+            LOG(TRACE,horiz_line,"\ninstrument_gseq():", function_name(fn->decl), "\n", horiz_line);
         }
 
         basic_block bb;
@@ -1438,7 +1442,7 @@ namespace reftrack {
         try{
             FOR_EACH_BB_FN(bb, fn){
                 bb_start_handler(bb);
-                LOG(TRACE, {"BLOCK START"});
+                LOG(TRACE, "BLOCK START");
 
                 for (gsi = gsi_start_bb(bb); !gsi_end_p(gsi); gsi_next(&gsi)) {
 
@@ -1448,7 +1452,7 @@ namespace reftrack {
                         continue;
 
                     auto gcode = gimple_code(stmt);
-                    LOG(TRACE, {"GCODE:", gcode, gimple_type_str(stmt)});
+                    LOG(TRACE, "GCODE:", gcode, gimple_type_str(stmt));
                     switch (gcode) {
                     case GIMPLE_BIND:
 
@@ -1478,16 +1482,16 @@ namespace reftrack {
                     }
 
                 }
-                LOG(TRACE, {"BLOCK END"});
+                LOG(TRACE, "BLOCK END");
                 bb_end_handler(bb);
             }
         }
         catch(std::exception& e){
             auto msg = e.what();
-            LOG(ERROR, { "Exception:", (msg ? msg : "unknown")});
+            LOG(ERROR,  "Exception:", (msg ? msg : "unknown"));
 
         }
-        LOG(TRACE, {horiz_line});
+        LOG(TRACE, horiz_line);
         return 0;
     }
 
@@ -1573,16 +1577,16 @@ namespace reftrack {
 
                 if (callee == G.get_orig_alloc_fn()){
                     new_callee = G.get_reftrack_alloc_fn();
-                    LOG(TRACE, {gimple_loc_str(stmt), "replacing allocator"});
+                    LOG(TRACE, gimple_loc_str(stmt), "replacing allocator");
 
                     if (new_callee){
                         gimple_call_set_fndecl(call, new_callee);
                         update_stmt(call);
-                        LOG(TRACE, {gimple_loc_str(stmt), "allocator replaced", get_name(new_callee)});
+                        LOG(TRACE, gimple_loc_str(stmt), "allocator replaced", get_name(new_callee));
                     }
                     else{
-                        LOG(ERROR, {gimple_loc_str(stmt),
-                                "Replace flag given, but allocator function missing"});
+                        LOG(ERROR, gimple_loc_str(stmt),
+                                "Replace flag given, but allocator function missing");
                     }
                 }
 
@@ -1604,8 +1608,8 @@ namespace reftrack {
                             update_stmt(call);
                         }
                         else{
-                            LOG(ERROR, {gimple_loc_str(stmt),
-                                    "Replace flag given, but free function missing"});
+                            LOG(ERROR, gimple_loc_str(stmt),
+                                    "Replace flag given, but free function missing");
                         }
                         break;
                     }
@@ -1630,7 +1634,7 @@ namespace reftrack {
             auto gsi = gsi_last(cleanup_seq);
             gsi_insert_seq_after(&gsi, try_cleanup, GSI_NEW_STMT);
             gimple_try_set_cleanup(dyn_cast<gtry*>(try_stmt), cleanup_seq);
-            LOG(TRACE, {"Reusing try block at ", gimple_loc_str(bind_stmt) });
+            LOG(TRACE, "Reusing try block at ", gimple_loc_str(bind_stmt) );
         }
         else{
             gbind_with_cleanup(bind_stmt, cleanup_seq);
@@ -1652,8 +1656,8 @@ namespace reftrack {
             if (gcode != GIMPLE_BIND)
                 return false;
 
-            LOG(TRACE,{horiz_line, "\ncleanup:", function_name(fn->decl),
-                    "\n",horiz_line}, "");
+            LOG(TRACE,horiz_line, "\ncleanup:", function_name(fn->decl),
+                    "\n",horiz_line, "");
 
             vector<gimple_build_info> tracked_vars;
             auto bind_stmt = dyn_cast<gbind*>(stmt);
@@ -1661,29 +1665,29 @@ namespace reftrack {
             for (auto block_var = gimple_bind_vars(bind_stmt); block_var;
                  block_var = TREE_CHAIN(block_var)) {
 
-                LOG(TRACE, {"Block var:", symbol_info(block_var)});
+                LOG(TRACE, "Block var:", symbol_info(block_var));
 
                 if (is_generated(block_var) || TREE_STATIC(block_var) )
                     continue;
 
                 if (is_array_of_tracked_struct(TREE_TYPE(block_var))){
-                    LOG(TRACE, {"Array type unsupported:var:", symbol_name(block_var)});
+                    LOG(TRACE, "Array type unsupported:var:", symbol_name(block_var));
                     continue;
                 }
 
                 int count = collect_tracked_fields(block_var, tracked_vars);
 
-                LOG(TRACE, {"var traverse:",count});
+                LOG(TRACE, "var traverse:",count);
 
             }
 
             if (tracked_vars.size()){
 
-                LOG(TRACE, {"\nAdded", tracked_vars.size(), "cleanup statement(s)"});
+                LOG(TRACE, "\nAdded", tracked_vars.size(), "cleanup statement(s)");
                 add_gimple_cleanup(bind_stmt, build_refcall_block(tracked_vars));
             }
 
-            LOG(TRACE,{horiz_line});
+            LOG(TRACE,horiz_line);
 
             return false;
         });
@@ -1756,27 +1760,27 @@ int plugin_init(struct plugin_name_args *plugin_info,
 
         if (arg_key == "orig_alloc" ){
             G.orig_alloc_fn_name = plugin_info->argv[i].value;
-            LOG(TRACE, {"Given original alloc function:", G.orig_alloc_fn_name});
+            LOG(TRACE, "Given original alloc function:", G.orig_alloc_fn_name);
         }
         else if (arg_key == "alloc" ){
             G.reftrack_alloc_fn_name = plugin_info->argv[i].value;
-            LOG(TRACE, {"Given alloc function:", G.reftrack_alloc_fn_name});
+            LOG(TRACE, "Given alloc function:", G.reftrack_alloc_fn_name);
         }
         else if (arg_key == "orig_free"){
             G.orig_free_fn_name = plugin_info->argv[i].value;
-            LOG(TRACE, {"Given original free function:", G.orig_free_fn_name});
+            LOG(TRACE, "Given original free function:", G.orig_free_fn_name);
         }
         else if (arg_key == "free"){
             G.reftrack_free_fn_name = plugin_info->argv[i].value;
-            LOG(TRACE, {"Given free function:", G.reftrack_free_fn_name});
+            LOG(TRACE, "Given free function:", G.reftrack_free_fn_name);
         }
         else if (arg_key == "addref"){
             G.default_addref_fn_name = plugin_info->argv[i].value;
-            LOG(TRACE, {"Given default addref function:", G.default_addref_fn_name});
+            LOG(TRACE, "Given default addref function:", G.default_addref_fn_name);
         }
         else if (arg_key == "removeref"){
             G.default_removeref_fn_name = plugin_info->argv[i].value;
-            LOG(TRACE, {"Given default removeref function:", G.default_removeref_fn_name});
+            LOG(TRACE, "Given default removeref function:", G.default_removeref_fn_name);
         }
         else if (arg_key == "log_level"){
             G.cur_log_level = log_level(atoi(plugin_info->argv[i].value));
@@ -1818,7 +1822,7 @@ int plugin_init(struct plugin_name_args *plugin_info,
     register_callback(PLUGIN_NAME, PLUGIN_PASS_MANAGER_SETUP, NULL,
                       &cleanup_rpi);
 
-    LOG(INFO, {PLUGIN_NAME, "plugin initialized"});
+    LOG(INFO, PLUGIN_NAME, "plugin initialized");
 
     return 0;
 }
